@@ -1,111 +1,133 @@
 # Leap-Frog Integration of the SIR Epidemic Model
 
-Numerical case study of the classical **Susceptible–Infected–Recovered (SIR)** compartmental model, integrated with the explicit **leap-frog** (centered two-step) method. The project is structured as a small Python package suitable for a data-science / scientific-computing portfolio: typed domain models, interchangeable ODE integrators, a convergence study against an adaptive RK45 reference, reproducible scenarios, tests, and CI.
+A numerical case study of the classical **Susceptible–Infected–Recovered (SIR)** model, solved with the explicit **leap-frog** method. The narrative below is the portfolio story: epidemic shape, peak timing under similar $R_0$, and why leap-frog is the right fixed-step scheme here.
 
-## Mathematical summary
+Reproduce every figure with:
 
-Closed population $N = S + I + R$ with transmission rate $\beta$ and recovery rate $\gamma$:
+```bash
+pip install -e ".[dev]"
+python main.py
+```
+
+---
+
+## 1. The question
+
+In a closed population of size $N$,
 
 $$
 \frac{dS}{dt} = -\beta S I, \qquad
 \frac{dI}{dt} = \beta S I - \gamma I, \qquad
-\frac{dR}{dt} = \gamma I.
+\frac{dR}{dt} = \gamma I,
 $$
 
-On a uniform step $h$, leap-frog advances the state $y = (S, I, R)$ by
-
-$$
-y_{n+1} = y_{n-1} + 2h\, f(y_n),
-$$
-
-after a forward-Euler starter $y_1 = y_0 + h\, f(y_0)$. Epidemic potential is summarized by
+with basic reproduction number
 
 $$
 R_0 = \frac{\beta N}{\gamma}.
 $$
 
-Accuracy is assessed via the global error against SciPy's adaptive RK45,
+Two outbreaks can share nearly the same $R_0$ and still look very different. This study fixes $N = 771$ and one index case, then varies $(\beta, \gamma)$:
+
+| Scenario | $\beta$ | $\gamma$ | $R_0$ |
+|----------|---------|----------|-------|
+| High transmission | $0.0022$ | $0.45$ | $\approx 3.77$ |
+| Moderate transmission | $0.001$ | $0.2$ | $\approx 3.86$ |
+
+---
+
+## 2. Epidemic trajectories
+
+Leap-frog integration of both scenarios produces the full compartment histories $S(t)$, $I(t)$, $R(t)$:
+
+![SIR compartment trajectories for high and moderate transmission](docs/figures/sir_leapfrog_comparison.png)
+
+**Reading the figure.** High transmission burns through susceptibles quickly: a sharp infected wave, then a recovered plateau near the whole population. Moderate transmission stretches the same qualitative arc over a longer horizon—susceptibles decline later, and recovery is still climbing at day 17.
+
+---
+
+## 3. Same $R_0$, different peak timing
+
+Overlaying only the infected curves makes the portfolio takeaway explicit:
+
+![Infection peaks for both scenarios under similar R0](docs/figures/infection_peaks.png)
+
+| Scenario | Peak day | Peak infected | Final attack size |
+|----------|----------|---------------|-------------------|
+| High transmission | $6.3$ | $\approx 295$ | $\approx 97\%$ |
+| Moderate transmission | $13.7$ | $\approx 301$ | $\approx 90\%$ |
+
+Peak heights are comparable; peak **timing** is not. $R_0$ alone does not determine the shape of an outbreak—the $(\beta, \gamma)$ pair does.
+
+---
+
+## 4. Why leap-frog
+
+On a uniform step $h$, leap-frog advances $y = (S, I, R)$ by
 
 $$
-E(h) = \max_t \bigl\| y_h(t) - y_{\mathrm{ref}}(t) \bigr\|_\infty,
+y_{n+1} = y_{n-1} + 2h\, f(y_n)
 $$
 
-comparing first-order forward Euler with second-order leap-frog on identical meshes.
+(after one Euler starter step). Against SciPy's adaptive RK45 reference, the global error
 
-Full derivation and discretization details: [`docs/methodology.md`](docs/methodology.md). Package layout: [`docs/architecture.md`](docs/architecture.md).
+$$
+E(h) = \max_t \bigl\| y_h(t) - y_{\mathrm{ref}}(t) \bigr\|_\infty
+$$
 
-## What this case study shows
+behaves as expected for each fixed-step scheme:
 
-Two calibrated outbreaks on the same population ($N = 771$, one index case) are compared:
+![Global error vs step size for forward Euler and leap-frog](docs/figures/method_convergence.png)
 
-| Scenario | $\beta$ | $\gamma$ | $R_0$ | Qualitative outcome |
-|----------|---------|----------|-------|---------------------|
-| High transmission | $0.0022$ | $0.45$ | $\approx 3.77$ | Early, sharp infection peak |
-| Moderate transmission | $0.001$ | $0.2$ | $\approx 3.86$ | Later peak, longer epidemic wave |
+| Method | Formal order | Observed order |
+|--------|--------------|----------------|
+| Forward Euler | $\mathcal{O}(h)$ | $\approx 0.99$ |
+| Leap-frog | $\mathcal{O}(h^2)$ | $\approx 2.00$ |
 
-Even with similar $R_0$, the $(\beta, \gamma)$ pair reshapes peak timing—an illustration of why reproduction numbers alone do not determine epidemic shape.
+Leap-frog is not only epidemiologically useful here—it is numerically second-order on this problem, which is the justification for preferring it over forward Euler.
 
-![SIR leap-frog comparison](docs/figures/sir_leapfrog_comparison.png)
+Details: [`docs/methodology.md`](docs/methodology.md) · layout: [`docs/architecture.md`](docs/architecture.md).
 
-![Method convergence](docs/figures/method_convergence.png)
+---
 
 ## Project layout
 
 ```text
-sir/           Core package (model, integrators, convergence, analysis, plots)
-main.py        CLI entry point
-tests/         pytest suite
-docs/          Methodology and architecture notes
-results/       Generated figures and JSON summaries (local only)
+sir/           Model, leap-frog / Euler / RK45, convergence, analysis, plots
+main.py        CLI — regenerates all storytelling figures + JSON summaries
+tests/         pytest (conservation, peaks, observed orders)
+docs/figures/  Plots embedded in this README
+.github/       CI on Python 3.10 and 3.12
 ```
 
-## Setup
+## Setup & run
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -e ".[dev]"
-```
-
-Requires Python 3.10+. Alternatively: `pip install -r requirements.txt`.
-
-## Run
-
-```bash
 python main.py
-```
-
-Writes:
-
-- `results/sir_leapfrog_comparison.png` — stacked $S,I,R$ trajectories
-- `results/method_convergence.png` — $\log E(h)$ vs $\log h$ for Euler and leap-frog
-- `results/summary.json` — $R_0$, peak day/height, attack size, population drift
-- `results/convergence.json` — per-step errors and observed orders
-
-Optional flags:
-
-```bash
-python main.py --scenarios high_transmission
-python main.py --convergence-scenario moderate_transmission
-python main.py --skip-convergence
-python main.py --output-dir results
-```
-
-## Tests
-
-```bash
 pytest -q
 ```
 
-Coverage includes parameter validation, population conservation, $R_0$-threshold behaviour, peak timing, and observed convergence orders versus RK45. GitHub Actions runs the same suite on Python 3.10 and 3.12.
+Artifacts under `results/`:
+
+- `sir_leapfrog_comparison.png` — full $S,I,R$ trajectories
+- `infection_peaks.png` — infected overlay with peak markers
+- `method_convergence.png` — $\log E(h)$ vs $\log h$
+- `summary.json`, `convergence.json`
+
+```bash
+python main.py --scenarios high_transmission
+python main.py --skip-convergence
+```
 
 ## Design highlights
 
-- **Typed domain layer** — immutable dataclasses for parameters, state, and results
-- **Interchangeable integrators** — leap-frog, forward Euler, and RK45 reference on a shared mesh
-- **Measured accuracy** — global-error study with observed $\mathcal{O}(h)$ / $\mathcal{O}(h^2)$ orders
-- **Reproducible scenarios** — experiment configs isolated from the solver
-- **Installable package** — `pyproject.toml` with optional `dev` extras and CI
+- Typed domain models and interchangeable integrators on a shared mesh
+- Measured accuracy: observed $\mathcal{O}(h)$ / $\mathcal{O}(h^2)$ vs RK45
+- Figures first in the README; code structured so those figures stay reproducible
+- Installable package (`pyproject.toml`) with CI
 
 ## License
 

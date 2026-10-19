@@ -68,6 +68,17 @@ def test_moderate_peak_later_than_high_transmission() -> None:
     assert infection_peak(moderate).time > infection_peak(high).time
 
 
+def test_infection_overlay_figure_builds() -> None:
+    from sir.plotting import build_infection_overlay_figure
+
+    paired = []
+    for scenario in SCENARIOS.values():
+        result = simulate_sir(scenario.parameters, scenario.initial)
+        paired.append((scenario, result))
+    fig = build_infection_overlay_figure(paired)
+    assert len(fig.axes) == 1
+
+
 def test_integrate_sir_matches_manual_model_call() -> None:
     params = SIRParameters(beta=0.0022, gamma=0.45, population=771.0)
     initial = SIRState(susceptible=770.0, infected=1.0, recovered=0.0)

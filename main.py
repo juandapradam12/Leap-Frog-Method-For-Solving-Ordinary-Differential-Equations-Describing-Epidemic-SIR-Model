@@ -15,7 +15,11 @@ from sir.analysis import (
 )
 from sir.convergence import run_convergence_study, summarize_orders
 from sir.leapfrog import simulate_sir
-from sir.plotting import save_comparison_figure, save_convergence_figure
+from sir.plotting import (
+    save_comparison_figure,
+    save_convergence_figure,
+    save_infection_overlay_figure,
+)
 from sir.scenarios import SCENARIOS
 
 
@@ -96,9 +100,14 @@ def main() -> None:
         paired,
         args.output_dir / "sir_leapfrog_comparison.png",
     )
+    overlay_path = save_infection_overlay_figure(
+        paired,
+        args.output_dir / "infection_peaks.png",
+    )
     summary_path = args.output_dir / "summary.json"
     summary_path.write_text(json.dumps(summaries, indent=2), encoding="utf-8")
     print(f"Figure written to {figure_path}")
+    print(f"Infection overlay written to {overlay_path}")
     print(f"Summary written to {summary_path}")
 
     if not args.skip_convergence:

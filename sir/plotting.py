@@ -89,6 +89,61 @@ def save_comparison_figure(
     return path
 
 
+INFECTION_CURVE_COLORS = ("#c0392b", "#1f4e79", "#1e8449", "#8e44ad")
+
+
+def build_infection_overlay_figure(
+    results: list[tuple[Scenario, SimulationResult]],
+) -> Figure:
+    """Overlay I(t) across scenarios and mark each infection peak."""
+    fig, ax = plt.subplots(figsize=(9.0, 4.6), constrained_layout=True)
+
+    for color, (scenario, result) in zip(INFECTION_CURVE_COLORS, results):
+        peak_idx = int(np.argmax(result.infected))
+        peak_t = float(result.time[peak_idx])
+        peak_i = float(result.infected[peak_idx])
+        ax.plot(
+            result.time,
+            result.infected,
+            color=color,
+            linewidth=2.0,
+            label=scenario.name,
+        )
+        ax.plot(peak_t, peak_i, marker="o", color=color, markersize=7)
+        ax.annotate(
+            f"peak @ {peak_t:.1f} d",
+            xy=(peak_t, peak_i),
+            xytext=(8, 10),
+            textcoords="offset points",
+            fontsize=9,
+            color=color,
+        )
+
+    ax.set_title("Infection peaks under similar $R_0$", fontsize=12, fontweight="bold")
+    ax.set_xlabel("Time (days)")
+    ax.set_ylabel("Infected population")
+    ax.grid(True, alpha=0.25, linewidth=0.8)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.legend(frameon=False, loc="upper right")
+    return fig
+
+
+def save_infection_overlay_figure(
+    results: list[tuple[Scenario, SimulationResult]],
+    output_path: str | Path,
+    *,
+    dpi: int = 160,
+) -> Path:
+    """Render and persist the infection-peak overlay figure."""
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig = build_infection_overlay_figure(results)
+    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
+    return path
+
+
 def build_convergence_figure(samples: list[ErrorSample]) -> Figure:
     """Log-log global error versus step size for each fixed-step method."""
     fig, ax = plt.subplots(figsize=(8.0, 5.2), constrained_layout=True)
