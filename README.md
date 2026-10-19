@@ -128,7 +128,3 @@ python main.py --skip-convergence
 - Measured accuracy: observed $\mathcal{O}(h)$ / $\mathcal{O}(h^2)$ vs RK45
 - Figures first in the README; code structured so those figures stay reproducible
 - Installable package (`pyproject.toml`) with CI
-
-## License
-
-MIT
