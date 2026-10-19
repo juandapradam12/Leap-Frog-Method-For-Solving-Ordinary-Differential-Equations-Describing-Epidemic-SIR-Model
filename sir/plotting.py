@@ -1,13 +1,15 @@
-"""Publication-style figures for SIR trajectories."""
+"""Publication-style figures for SIR trajectories and convergence studies."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
+from sir.convergence import ErrorSample
 from sir.model import SimulationResult
 from sir.scenarios import Scenario
 
@@ -16,6 +18,11 @@ COMPARTMENT_STYLES = (
     ("Infected", "infected", "#c0392b"),
     ("Recovered", "recovered", "#1e8449"),
 )
+
+METHOD_STYLES = {
+    "forward_euler": ("Forward Euler", "#c0392b", "o"),
+    "leapfrog": ("Leap-frog", "#1f4e79", "s"),
+}
 
 
 def _style_axes(ax: Axes, title: str) -> None:
@@ -77,6 +84,75 @@ def save_comparison_figure(
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig = build_comparison_figure(results)
+    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
+    return path
+
+
+def build_convergence_figure(samples: list[ErrorSample]) -> Figure:
+    """Log-log global error versus step size for each fixed-step method."""
+    fig, ax = plt.subplots(figsize=(8.0, 5.2), constrained_layout=True)
+
+    for method, (label, color, marker) in METHOD_STYLES.items():
+        subset = [s for s in samples if s.method == method]
+        if not subset:
+            continue
+        steps = np.array([s.step for s in subset], dtype=float)
+        errors = np.array([s.max_abs_error for s in subset], dtype=float)
+        order = steps.argsort()
+        ax.loglog(
+            steps[order],
+            errors[order],
+            marker=marker,
+            color=color,
+            linewidth=1.8,
+            markersize=7,
+            label=label,
+        )
+
+    # Reference slopes anchored at the coarsest leap-frog sample when available.
+    leap = [s for s in samples if s.method == "leapfrog"]
+    if leap:
+        anchor = max(leap, key=lambda s: s.step)
+        h_ref = np.array([anchor.step, min(s.step for s in leap)], dtype=float)
+        e0 = anchor.max_abs_error
+        ax.loglog(
+            h_ref,
+            e0 * (h_ref / h_ref[0]),
+            linestyle="--",
+            color="#7f8c8d",
+            linewidth=1.2,
+            label=r"$\mathcal{O}(h)$",
+        )
+        ax.loglog(
+            h_ref,
+            e0 * (h_ref / h_ref[0]) ** 2,
+            linestyle=":",
+            color="#7f8c8d",
+            linewidth=1.2,
+            label=r"$\mathcal{O}(h^2)$",
+        )
+
+    ax.set_xlabel("Step size $h$")
+    ax.set_ylabel(r"Global error $\max_t\|y_h(t) - y_{\mathrm{ref}}(t)\|_\infty$")
+    ax.set_title("Fixed-step accuracy versus RK45 reference")
+    ax.grid(True, which="both", alpha=0.25, linewidth=0.8)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.legend(frameon=False, loc="best")
+    return fig
+
+
+def save_convergence_figure(
+    samples: list[ErrorSample],
+    output_path: str | Path,
+    *,
+    dpi: int = 160,
+) -> Path:
+    """Render and persist the convergence comparison figure."""
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig = build_convergence_figure(samples)
     fig.savefig(path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
     return path

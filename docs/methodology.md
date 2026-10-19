@@ -54,6 +54,24 @@ $$
 
 The method is second-order accurate in $h$. Because $f$ is divergence-free for the SIR vector field ($\partial_S f_S + \partial_I f_I + \partial_R f_R = 0$), the continuous flow preserves $N$; the discrete trajectory inherits this conservation up to truncation error, which is monitored in the analysis layer.
 
+## Baseline and reference schemes
+
+For the same autonomous system $y' = f(y)$, two additional integrators are used only for accuracy assessment:
+
+| Method | Update | Formal order |
+|--------|--------|--------------|
+| Forward Euler | $y_{n+1} = y_n + h\, f(y_n)$ | $\mathcal{O}(h)$ |
+| Leap-frog | $y_{n+1} = y_{n-1} + 2h\, f(y_n)$ | $\mathcal{O}(h^2)$ |
+| RK45 (`scipy.integrate.solve_ivp`) | adaptive | reference |
+
+On each mesh $h$, the adaptive RK45 solution evaluated at the same nodes defines $y_{\mathrm{ref}}$. The global error of a fixed-step method is
+
+$$
+E(h) = \max_t \bigl\| y_h(t) - y_{\mathrm{ref}}(t) \bigr\|_\infty.
+$$
+
+Observed orders are recovered from a log-log least-squares fit of $E(h)$ versus $h$. Empirically, Euler tracks $\mathcal{O}(h)$ while leap-frog tracks $\mathcal{O}(h^2)$, which is the numerical justification for preferring leap-frog in this case study.
+
 ## Scenario design
 
 Both scenarios share $N = 771$ and the seed $(S_0, I_0, R_0) = (770, 1, 0)$, and are integrated on $t \in [0, 17]$ with $h = 10^{-3}$.
@@ -71,4 +89,5 @@ For each integrated trajectory the code reports:
 
 - peak infection time $t^\star = \arg\max_t I(t)$ and height $I(t^\star)$;
 - final attack size $1 - S(t_{\mathrm{end}})/N$;
-- maximum population drift $\max_t |S+I+R - N|$ as a numerical sanity check.
+- maximum population drift $\max_t |S+I+R - N|$ as a numerical sanity check;
+- convergence table $E(h)$ and observed orders for Euler versus leap-frog.

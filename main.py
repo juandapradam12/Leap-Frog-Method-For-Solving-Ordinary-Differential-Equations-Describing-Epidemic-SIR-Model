@@ -13,14 +13,18 @@ from sir.analysis import (
     population_drift,
     reproduction_number,
 )
+from sir.convergence import run_convergence_study, summarize_orders
 from sir.leapfrog import simulate_sir
-from sir.plotting import save_comparison_figure
+from sir.plotting import save_comparison_figure, save_convergence_figure
 from sir.scenarios import SCENARIOS
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Integrate classical SIR scenarios with the leap-frog method.",
+        description=(
+            "Integrate classical SIR scenarios with leap-frog and compare "
+            "fixed-step accuracy against an RK45 reference."
+        ),
     )
     parser.add_argument(
         "--output-dir",
@@ -34,6 +38,17 @@ def parse_args() -> argparse.Namespace:
         choices=sorted(SCENARIOS),
         default=list(SCENARIOS),
         help="Scenario keys to integrate.",
+    )
+    parser.add_argument(
+        "--convergence-scenario",
+        choices=sorted(SCENARIOS),
+        default="high_transmission",
+        help="Scenario used for the Euler vs leap-frog convergence study.",
+    )
+    parser.add_argument(
+        "--skip-convergence",
+        action="store_true",
+        help="Skip the numerical method comparison.",
     )
     return parser.parse_args()
 
@@ -83,9 +98,35 @@ def main() -> None:
     )
     summary_path = args.output_dir / "summary.json"
     summary_path.write_text(json.dumps(summaries, indent=2), encoding="utf-8")
-
     print(f"Figure written to {figure_path}")
     print(f"Summary written to {summary_path}")
+
+    if not args.skip_convergence:
+        conv_scenario = SCENARIOS[args.convergence_scenario]
+        samples = run_convergence_study(conv_scenario)
+        orders = summarize_orders(samples)
+        conv_figure = save_convergence_figure(
+            samples,
+            args.output_dir / "method_convergence.png",
+        )
+        conv_path = args.output_dir / "convergence.json"
+        conv_path.write_text(
+            json.dumps(
+                {
+                    "scenario": args.convergence_scenario,
+                    "observed_orders": orders,
+                    "samples": [sample.to_dict() for sample in samples],
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        print(
+            "Observed orders: "
+            + ", ".join(f"{name}≈{order:.2f}" for name, order in orders.items())
+        )
+        print(f"Convergence figure written to {conv_figure}")
+        print(f"Convergence summary written to {conv_path}")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Leap-Frog Integration of the SIR Epidemic Model
 
-Numerical case study of the classical **Susceptible–Infected–Recovered (SIR)** compartmental model, integrated with the explicit **leap-frog** (centered two-step) method. The project is structured as a small Python package suitable for a data-science / scientific-computing portfolio: typed domain models, a reusable ODE integrator, reproducible scenarios, tests, and concise technical documentation.
+Numerical case study of the classical **Susceptible–Infected–Recovered (SIR)** compartmental model, integrated with the explicit **leap-frog** (centered two-step) method. The project is structured as a small Python package suitable for a data-science / scientific-computing portfolio: typed domain models, interchangeable ODE integrators, a convergence study against an adaptive RK45 reference, reproducible scenarios, tests, and CI.
 
 ## Mathematical summary
 
@@ -24,7 +24,15 @@ $$
 R_0 = \frac{\beta N}{\gamma}.
 $$
 
-Full derivation, discretization details, and scenario rationale: [`docs/methodology.md`](docs/methodology.md). Package layout: [`docs/architecture.md`](docs/architecture.md).
+Accuracy is assessed via the global error against SciPy's adaptive RK45,
+
+$$
+E(h) = \max_t \bigl\| y_h(t) - y_{\mathrm{ref}}(t) \bigr\|_\infty,
+$$
+
+comparing first-order forward Euler with second-order leap-frog on identical meshes.
+
+Full derivation and discretization details: [`docs/methodology.md`](docs/methodology.md). Package layout: [`docs/architecture.md`](docs/architecture.md).
 
 ## What this case study shows
 
@@ -39,10 +47,12 @@ Even with similar $R_0$, the $(\beta, \gamma)$ pair reshapes peak timing—an il
 
 ![SIR leap-frog comparison](docs/figures/sir_leapfrog_comparison.png)
 
+![Method convergence](docs/figures/method_convergence.png)
+
 ## Project layout
 
 ```text
-sir/           Core package (model, integrator, scenarios, analysis, plots)
+sir/           Core package (model, integrators, convergence, analysis, plots)
 main.py        CLI entry point
 tests/         pytest suite
 docs/          Methodology and architecture notes
@@ -54,10 +64,10 @@ results/       Generated figures and JSON summaries (local only)
 ```bash
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
-Requires Python 3.10+.
+Requires Python 3.10+. Alternatively: `pip install -r requirements.txt`.
 
 ## Run
 
@@ -68,12 +78,16 @@ python main.py
 Writes:
 
 - `results/sir_leapfrog_comparison.png` — stacked $S,I,R$ trajectories
+- `results/method_convergence.png` — $\log E(h)$ vs $\log h$ for Euler and leap-frog
 - `results/summary.json` — $R_0$, peak day/height, attack size, population drift
+- `results/convergence.json` — per-step errors and observed orders
 
 Optional flags:
 
 ```bash
 python main.py --scenarios high_transmission
+python main.py --convergence-scenario moderate_transmission
+python main.py --skip-convergence
 python main.py --output-dir results
 ```
 
@@ -83,14 +97,15 @@ python main.py --output-dir results
 pytest -q
 ```
 
-Coverage includes parameter validation, population conservation under leap-frog, $R_0$-threshold behaviour, and relative peak timing between scenarios.
+Coverage includes parameter validation, population conservation, $R_0$-threshold behaviour, peak timing, and observed convergence orders versus RK45. GitHub Actions runs the same suite on Python 3.10 and 3.12.
 
 ## Design highlights
 
 - **Typed domain layer** — immutable dataclasses for parameters, state, and results
-- **Reusable integrator** — leap-frog over any autonomous $f(y)$, not hard-wired to plotting
+- **Interchangeable integrators** — leap-frog, forward Euler, and RK45 reference on a shared mesh
+- **Measured accuracy** — global-error study with observed $\mathcal{O}(h)$ / $\mathcal{O}(h^2)$ orders
 - **Reproducible scenarios** — experiment configs isolated from the solver
-- **Measurable numerics** — population drift and peak statistics reported alongside the figure
+- **Installable package** — `pyproject.toml` with optional `dev` extras and CI
 
 ## License
 
